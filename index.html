@@ -12,33 +12,72 @@
             font-family: 'Inter', sans-serif;
             background-color: #0f172a;
             overflow: hidden;
-            touch-action: none; /* 모바일 스크롤 방지 */
+            touch-action: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* 라이트 모드 스타일 */
+        body.light-mode {
+            background-color: #f8fafc;
+            color: #1e293b;
         }
 
         #gameCanvas {
             border-radius: 1rem;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
             background: linear-gradient(to bottom, #1e293b, #0f172a);
             max-width: 100%;
             max-height: 70vh;
+            transition: all 0.3s ease;
         }
 
-        .neon-text {
-            text-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+        body.light-mode #gameCanvas {
+            background: linear-gradient(to bottom, #e2e8f0, #cbd5e1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
 
-        .btn-arcade {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 0 #1d4ed8;
+        body.light-mode .neon-text {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+            color: #1e40af;
         }
-
+/* ... existing code ... -->
         .btn-arcade:active {
             transform: translateY(4px);
             box-shadow: 0 0 0 #1d4ed8;
         }
+
+        /* 테마 토글 버튼 스타일 */
+        #themeToggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 50;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 9999px;
+            transition: background-color 0.2s;
+        }
+        #themeToggle:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        body.light-mode #themeToggle:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4 text-white">
+
+    <!-- 테마 토글 버튼 -->
+    <button id="themeToggle" aria-label="Toggle Theme">
+        <!-- Sun Icon (shown in dark mode) -->
+        <svg id="sunIcon" class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.364 17.636l-.707.707M16.364 17.636l.707.707M7.636 5.636l.707.707M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        <!-- Moon Icon (hidden by default, shown in light mode) -->
+        <svg id="moonIcon" class="hidden w-8 h-8 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        </svg>
+    </button>
 
     <div class="text-center mb-6">
         <h1 class="text-4xl md:text-5xl font-black mb-2 neon-text italic tracking-tighter">STONE DODGE</h1>
@@ -73,6 +112,22 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        // 테마 관리
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+        let isDarkMode = true;
+
+        themeToggle.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('light-mode');
+            sunIcon.classList.toggle('hidden');
+            moonIcon.classList.toggle('hidden');
+            
+            // 플레이어 색상 및 돌 색상 테마에 맞춰 조정
+            player.color = isDarkMode ? '#3b82f6' : '#2563eb';
+        });
+
         const currentScoreEl = document.getElementById('currentScore');
         const bestScoreEl = document.getElementById('bestScore');
         const overlay = document.getElementById('overlay');
@@ -181,16 +236,16 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Stars/Background details
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            // Draw Stars/Background details (테마에 따라 투명도 조절)
+            ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
             for(let i=0; i<10; i++) {
                 ctx.beginPath();
                 ctx.arc((Math.sin(Date.now()*0.001 + i)*200) + 200, (i*60 + Date.now()*0.1)%600, 1, 0, Math.PI*2);
                 ctx.fill();
             }
 
-            // Draw Player (Modern ship shape)
-            ctx.shadowBlur = 15;
+            // Draw Player
+            ctx.shadowBlur = isDarkMode ? 15 : 5;
             ctx.shadowColor = player.color;
             ctx.fillStyle = player.color;
             ctx.beginPath();
@@ -202,7 +257,7 @@
             ctx.shadowBlur = 0;
 
             // Draw Stones
-            ctx.fillStyle = '#64748b';
+            ctx.fillStyle = isDarkMode ? '#64748b' : '#475569';
             stones.forEach(s => {
                 ctx.save();
                 ctx.translate(s.x + s.width/2, s.y + s.height/2);
