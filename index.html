@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodge the Stones - GitHub Portfolio Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            overflow: hidden;
+            touch-action: none; /* 모바일 스크롤 방지 */
+        }
+
+        #gameCanvas {
+            border-radius: 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
+            background: linear-gradient(to bottom, #1e293b, #0f172a);
+            max-width: 100%;
+            max-height: 70vh;
+        }
+
+        .neon-text {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+        }
+
+        .btn-arcade {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 0 #1d4ed8;
+        }
+
+        .btn-arcade:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #1d4ed8;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-white">
+
+    <div class="text-center mb-6">
+        <h1 class="text-4xl md:text-5xl font-black mb-2 neon-text italic tracking-tighter">STONE DODGE</h1>
+        <div class="flex gap-8 justify-center text-sm font-bold text-blue-400">
+            <div>SCORE: <span id="currentScore">0</span></div>
+            <div>BEST: <span id="bestScore">0</span></div>
+        </div>
+    </div>
+
+    <div class="relative group">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <!-- Overlay for Start/Game Over -->
+        <div id="overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-[1rem] transition-opacity duration-300">
+            <h2 id="overlayTitle" class="text-3xl font-bold mb-4">READY?</h2>
+            <button id="startBtn" class="btn-arcade bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-full font-bold text-lg">
+                START GAME
+            </button>
+            <p class="mt-4 text-gray-400 text-xs animate-pulse">Use Arrow Keys or Touch to Move</p>
+        </div>
+    </div>
+
+    <div class="mt-8 flex gap-4 md:hidden">
+        <button id="leftBtn" class="btn-arcade bg-slate-700 p-6 rounded-2xl active:bg-blue-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button id="rightBtn" class="btn-arcade bg-slate-700 p-6 rounded-2xl active:bg-blue-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const currentScoreEl = document.getElementById('currentScore');
+        const bestScoreEl = document.getElementById('bestScore');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const startBtn = document.getElementById('startBtn');
+
+        // Game State
+        let gameActive = false;
+        let score = 0;
+        let bestScore = localStorage.getItem('stoneDodge_bestScore') || 0;
+        bestScoreEl.innerText = bestScore;
+
+        // Player properties
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 40,
+            width: 30,
+            height: 30,
+            speed: 7,
+            color: '#3b82f6',
+            dx: 0
+        };
+
+        // Stones properties
+        let stones = [];
+        let stoneFrequency = 0.02;
+        let gameSpeed = 3;
+
+        // Mouse Controls
+        canvas.addEventListener('mousemove', (e) => {
+            if (!gameActive) return;
+            
+            // 캔버스 내 마우스 위치 계산
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width; // 캔버스 실제 크기 비율 계산
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            
+            // 플레이어 중앙이 마우스 위치에 오도록 설정
+            player.x = mouseX - player.width / 2;
+            
+            // 경계값 처리
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        });
+
+        function createStone() {
+            const size = Math.random() * (40 - 20) + 20;
+            stones.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                width: size,
+                height: size,
+                speed: Math.random() * (gameSpeed + 2 - gameSpeed) + gameSpeed,
+                rotation: 0,
+                rotSpeed: Math.random() * 0.1 - 0.05
+            });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Move player (Keyboard/Button support)
+            player.x += player.dx;
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+            // Spawn stones
+            if (Math.random() < stoneFrequency) {
+                createStone();
+            }
+
+            // Update stones and check collision
+            for (let i = stones.length - 1; i >= 0; i--) {
+                const s = stones[i];
+                s.y += s.speed;
+                s.rotation += s.rotSpeed;
+
+                // Collision detection (Rect-to-Rect)
+                if (
+                    player.x < s.x + s.width &&
+                    player.x + player.width > s.x &&
+                    player.y < s.y + s.height &&
+                    player.y + player.height > s.y
+                ) {
+                    gameOver();
+                }
+
+                // Remove off-screen stones and increase score
+                if (s.y > canvas.height) {
+                    stones.splice(i, 1);
+                    score++;
+                    currentScoreEl.innerText = score;
+                    
+                    // Difficulty progression
+                    if (score % 10 === 0) {
+                        gameSpeed += 0.1;
+                        stoneFrequency += 0.001;
+                    }
+                }
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Stars/Background details
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            for(let i=0; i<10; i++) {
+                ctx.beginPath();
+                ctx.arc((Math.sin(Date.now()*0.001 + i)*200) + 200, (i*60 + Date.now()*0.1)%600, 1, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Draw Player (Modern ship shape)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.width / 2, player.y);
+            ctx.lineTo(player.x, player.y + player.height);
+            ctx.lineTo(player.x + player.width, player.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw Stones
+            ctx.fillStyle = '#64748b';
+            stones.forEach(s => {
+                ctx.save();
+                ctx.translate(s.x + s.width/2, s.y + s.height/2);
+                ctx.rotate(s.rotation);
+                
+                // Draw irregular stone shape
+                ctx.beginPath();
+                ctx.rect(-s.width/2, -s.height/2, s.width, s.height);
+                ctx.fill();
+                
+                // Texture detail
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-s.width/2 + 5, -s.height/2 + 5, s.width-10, s.height-10);
+                
+                ctx.restore();
+            });
+        }
+
+        function gameOver() {
+            gameActive = false;
+            overlayTitle.innerText = "GAME OVER";
+            overlayTitle.classList.add('text-red-500');
+            startBtn.innerText = "RETRY";
+            overlay.style.opacity = "1";
+            overlay.classList.remove('pointer-events-none');
+
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('stoneDodge_bestScore', bestScore);
+                bestScoreEl.innerText = bestScore;
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            currentScoreEl.innerText = "0";
+            stones = [];
+            gameSpeed = 3;
+            stoneFrequency = 0.02;
+            player.x = canvas.width / 2 - 15;
+            gameActive = true;
+            
+            overlay.style.opacity = "0";
+            overlay.classList.add('pointer-events-none');
+            
+            update();
+        }
+
+        // Key Controls
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowLeft') player.dx = -player.speed;
+            if (e.key === 'ArrowRight') player.dx = player.speed;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+        });
+
+        // Touch/Button Controls
+        document.getElementById('leftBtn').addEventListener('touchstart', (e) => { e.preventDefault(); player.dx = -player.speed; });
+        document.getElementById('leftBtn').addEventListener('touchend', () => player.dx = 0);
+        document.getElementById('rightBtn').addEventListener('touchstart', (e) => { e.preventDefault(); player.dx = player.speed; });
+        document.getElementById('rightBtn').addEventListener('touchend', () => player.dx = 0);
+
+        // Start Button
+        startBtn.addEventListener('click', startGame);
+
+        // Initial Draw
+        draw();
+    </script>
+</body>
+</html>
